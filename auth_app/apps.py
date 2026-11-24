@@ -2,4 +2,6 @@ from django.apps import AppConfig
 
 
 class AuthAppConfig(AppConfig):
-    name = 'auth_app'
+    """Configuration for the AuthApp"""
+
+    name = "auth_app"
