@@ -28,6 +28,9 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY is not set in the environment variables.")
 
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
