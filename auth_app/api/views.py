@@ -3,6 +3,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .serializers import RegistrationSerializer
@@ -96,4 +97,32 @@ class CookieTokenRefreshView(TokenRefreshView):
             samesite="Lax",
         )
 
+        return response
+
+
+class LogoutView(APIView):
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if refresh_token is None:
+            return Response(
+                {"detail": "Refresh token is not found!"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        try:
+            RefreshToken(refresh_token).blacklist()
+        except TokenError:
+            return Response(
+                {"detail": "Refresh token is invalid!"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        response = Response(
+            {
+                "detail": "Log-Out successfully! All Tokens will be deleted. Refresh token is now invalid."
+            }
+        )
+        response.delete_cookie("refresh_token")
+        response.delete_cookie("access_token")
         return response

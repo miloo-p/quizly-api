@@ -162,3 +162,49 @@ class TokenRefreshTests(APITestCase):
         self.client.cookies["refresh_token"] = self.client.cookies["access_token"].value
         response = self.client.post(self.url)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class LogoutTests(APITestCase):
+    """Tests for POST /api/logout/ and the cookie authentication."""
+
+    url = "/api/logout/"
+
+    def setUp(self):
+        """Creates a user and logs in, so the client holds both token cookies."""
+        User.objects.create_user(username="testuser", password="testpassword123")
+        login_data = {"username": "testuser", "password": "testpassword123"}
+        self.client.post("/api/login/", login_data, format="json")
+
+    def test_logout_returns_200_with_detail(self):
+        """A logged-in user gets 200 and the message from the doc."""
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        expected = "Log-Out successfully! All Tokens will be deleted. Refresh token is now invalid."
+        self.assertEqual(response.data, {"detail": expected})
+
+    def test_logout_deletes_both_cookies(self):
+        """The response empties both token cookies and lets them expire."""
+        response = self.client.post(self.url)
+        for name in ["access_token", "refresh_token"]:
+            self.assertEqual(response.cookies[name].value, "")
+            self.assertEqual(response.cookies[name]["max-age"], 0)
+
+    def test_old_refresh_token_is_blacklisted(self):
+        """After logout the old refresh token can no longer be used."""
+        old_refresh = self.client.cookies["refresh_token"].value
+        self.client.post(self.url)
+        self.client.cookies["refresh_token"] = old_refresh
+        response = self.client.post("/api/token/refresh/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_without_cookies_returns_401(self):
+        """Without token cookies the user is not authenticated."""
+        self.client.cookies.clear()
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_invalid_access_cookie_returns_401(self):
+        """An invalid access_token cookie is rejected with 401."""
+        self.client.cookies["access_token"] = "invalid-token"
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
