@@ -1,3 +1,19 @@
 from django.contrib import admin
 
-# Register your models here.
+from .models import Question, Quiz
+
+
+class QuestionInline(admin.TabularInline):
+    model = Question
+    extra = 0
+
+
+@admin.register(Quiz)
+class QuizAdmin(admin.ModelAdmin):
+    list_display = ["title", "user", "created_at"]
+    inlines = [QuestionInline]
+
+
+@admin.register(Question)
+class QuestionAdmin(admin.ModelAdmin):
+    list_display = ["question_title", "quiz"]
