@@ -3,6 +3,7 @@
 from django.contrib.auth.models import User
 from rest_framework import status
 from rest_framework.test import APITestCase
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
 
 class RegistrationTests(APITestCase):
@@ -65,3 +66,56 @@ class RegistrationTests(APITestCase):
         """An empty email is rejected."""
         self.data["email"] = ""
         self.assert_rejected("email")
+
+
+class LoginTests(APITestCase):
+    """Tests for POST /api/login/."""
+
+    url = "/api/login/"
+
+    def setUp(self):
+        """Creates a user and a valid login body as in the API doc."""
+        self.user = User.objects.create_user(
+            username="testuser", email="test@example.com", password="testpassword123"
+        )
+        self.data = {"username": "testuser", "password": "testpassword123"}
+
+    def test_valid_login_returns_200_with_detail_and_user(self):
+        """Valid credentials return 200 with detail and the user data from the doc."""
+        response = self.client.post(self.url, self.data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["detail"], "Login successfully!")
+        expected_user = {"id": self.user.id, "username": "testuser", "email": "test@example.com"}
+        self.assertEqual(response.data["user"], expected_user)
+
+    def test_valid_login_sets_httponly_token_cookies(self):
+        """Login sets access_token and refresh_token as HttpOnly cookies."""
+        response = self.client.post(self.url, self.data, format="json")
+        for name in ["access_token", "refresh_token"]:
+            self.assertIn(name, response.cookies)
+            self.assertTrue(response.cookies[name]["httponly"])
+
+    def test_tokens_are_not_in_response_body(self):
+        """The tokens are only sent as cookies, not in the JSON body."""
+        response = self.client.post(self.url, self.data, format="json")
+        self.assertEqual(set(response.data.keys()), {"detail", "user"})
+
+    def test_wrong_password_returns_401(self):
+        """A wrong password is rejected with 401."""
+        self.data["password"] = "wrongpassword"
+        response = self.client.post(self.url, self.data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_unknown_username_returns_401(self):
+        """An unknown username is rejected with 401."""
+        self.data["username"] = "nobody"
+        response = self.client.post(self.url, self.data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_cookies_contain_valid_tokens_of_the_user(self):
+        """The cookies hold a real access and refresh token of the logged-in user."""
+        response = self.client.post(self.url, self.data, format="json")
+        access = AccessToken(response.cookies["access_token"].value)
+        refresh = RefreshToken(response.cookies["refresh_token"].value)
+        self.assertEqual(access["user_id"], str(self.user.id))
+        self.assertEqual(refresh["user_id"], str(self.user.id))
