@@ -6,7 +6,10 @@ from urllib.parse import parse_qs, urlparse
 import whisper
 import yt_dlp
 from django.conf import settings
+from django.db import transaction
 from google import genai
+
+from .models import Question, Quiz
 
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com"}
 
@@ -78,3 +81,21 @@ def create_quiz_data(url):
         audio_path = download_audio(url, folder)
         transcript = transcribe_audio(audio_path)
     return generate_quiz(transcript)
+
+
+def save_quiz(user, url, quiz_data):
+    with transaction.atomic():
+        quiz = Quiz.objects.create(
+            user=user,
+            title=quiz_data["title"],
+            description=quiz_data["description"],
+            video_url=url,
+        )
+        for question in quiz_data["questions"]:
+            Question.objects.create(
+                quiz=quiz,
+                question_title=question["question_title"],
+                question_options=question["question_options"],
+                answer=question["answer"],
+            )
+    return quiz
