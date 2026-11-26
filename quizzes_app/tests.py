@@ -8,7 +8,7 @@ from django.test import SimpleTestCase
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from .models import Quiz
+from .models import Question, Quiz
 from .utils import is_valid_youtube_url, parse_quiz_response
 
 
@@ -176,3 +176,72 @@ class CreateQuizTests(APITestCase):
         self.client.raise_request_exception = False
         self.post_url(self.video_url)
         self.assertEqual(Quiz.objects.count(), 0)
+
+
+def create_quiz(user, title="My Quiz"):
+    """Saves a quiz with two questions for the given user directly in the database."""
+    quiz = Quiz.objects.create(
+        user=user,
+        title=title,
+        description="Description",
+        video_url="https://www.youtube.com/watch?v=YE7VzlLtp-4",
+    )
+    for number in range(1, 3):
+        Question.objects.create(
+            quiz=quiz,
+            question_title=f"Question {number}?",
+            question_options=["A", "B", "C", "D"],
+            answer="A",
+        )
+    return quiz
+
+
+class ListQuizzesTests(APITestCase):
+    """Tests for GET /api/quizzes/."""
+
+    url = "/api/quizzes/"
+
+    def setUp(self):
+        """Creates a user and logs in, so the client holds the token cookies."""
+        self.user = User.objects.create_user(username="testuser", password="testpassword123")
+        login_data = {"username": "testuser", "password": "testpassword123"}
+        self.client.post("/api/login/", login_data, format="json")
+
+    def test_without_login_returns_401(self):
+        """Without token cookies the user is not authenticated."""
+        self.client.cookies.clear()
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_no_quizzes_returns_empty_list(self):
+        """A user without quizzes gets 200 and an empty list."""
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data, [])
+
+    def test_only_own_quizzes_are_listed(self):
+        """Quizzes of other users do not show up."""
+        other_user = User.objects.create_user(username="otheruser", password="otherpassword123")
+        create_quiz(self.user, title="My Quiz")
+        create_quiz(other_user, title="Other Quiz")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual([quiz["title"] for quiz in response.data], ["My Quiz"])
+
+    def test_response_has_doc_format(self):
+        """Quiz keys as in the doc, questions without created_at/updated_at."""
+        create_quiz(self.user)
+        quiz = self.client.get(self.url).data[0]
+        quiz_keys = {
+            "id",
+            "title",
+            "description",
+            "created_at",
+            "updated_at",
+            "video_url",
+            "questions",
+        }
+        self.assertEqual(set(quiz.keys()), quiz_keys)
+        self.assertEqual(len(quiz["questions"]), 2)
+        question_keys = {"id", "question_title", "question_options", "answer"}
+        self.assertEqual(set(quiz["questions"][0].keys()), question_keys)

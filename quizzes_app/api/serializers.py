@@ -33,3 +33,13 @@ class QuizSerializer(serializers.ModelSerializer):
             "video_url",
             "questions",
         ]
+
+
+class QuestionListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Question
+        fields = ["id", "question_title", "question_options", "answer"]
+
+
+class QuizListSerializer(QuizSerializer):
+    questions = QuestionListSerializer(many=True, read_only=True)

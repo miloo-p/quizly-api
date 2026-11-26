@@ -2,8 +2,9 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from ..models import Quiz
 from ..utils import create_quiz_data, save_quiz
-from .serializers import QuizCreateSerializer, QuizSerializer
+from .serializers import QuizCreateSerializer, QuizListSerializer, QuizSerializer
 
 
 class QuizListCreateView(APIView):
@@ -20,3 +21,7 @@ class QuizListCreateView(APIView):
             )
         quiz = save_quiz(request.user, url, quiz_data)
         return Response(QuizSerializer(quiz).data, status=status.HTTP_201_CREATED)
+
+    def get(self, request):
+        quizzes = Quiz.objects.filter(user=request.user)
+        return Response(QuizListSerializer(quizzes, many=True).data)
