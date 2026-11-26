@@ -245,3 +245,54 @@ class ListQuizzesTests(APITestCase):
         self.assertEqual(len(quiz["questions"]), 2)
         question_keys = {"id", "question_title", "question_options", "answer"}
         self.assertEqual(set(quiz["questions"][0].keys()), question_keys)
+
+
+class QuizDetailTests(APITestCase):
+    """Tests for GET /api/quizzes/{id}/."""
+
+    def setUp(self):
+        """Creates a user with one quiz and logs in."""
+        self.user = User.objects.create_user(username="testuser", password="testpassword123")
+        self.quiz = create_quiz(self.user)
+        login_data = {"username": "testuser", "password": "testpassword123"}
+        self.client.post("/api/login/", login_data, format="json")
+
+    def detail_url(self, quiz_id):
+        """Returns the detail URL for the given quiz id."""
+        return f"/api/quizzes/{quiz_id}/"
+
+    def test_own_quiz_returns_200_in_doc_format(self):
+        """The owner gets the quiz with the keys from the doc, questions without timestamps."""
+        response = self.client.get(self.detail_url(self.quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], self.quiz.id)
+        quiz_keys = {
+            "id",
+            "title",
+            "description",
+            "created_at",
+            "updated_at",
+            "video_url",
+            "questions",
+        }
+        self.assertEqual(set(response.data.keys()), quiz_keys)
+        question_keys = {"id", "question_title", "question_options", "answer"}
+        self.assertEqual(set(response.data["questions"][0].keys()), question_keys)
+
+    def test_foreign_quiz_returns_403(self):
+        """A quiz of another user is forbidden, not hidden."""
+        other_user = User.objects.create_user(username="otheruser", password="otherpassword123")
+        foreign_quiz = create_quiz(other_user, title="Other Quiz")
+        response = self.client.get(self.detail_url(foreign_quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unknown_id_returns_404(self):
+        """An id that does not exist returns 404."""
+        response = self.client.get(self.detail_url(9999))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_without_login_returns_401(self):
+        """Without token cookies the user is not authenticated."""
+        self.client.cookies.clear()
+        response = self.client.get(self.detail_url(self.quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

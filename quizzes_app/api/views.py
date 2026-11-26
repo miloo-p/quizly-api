@@ -1,10 +1,13 @@
+from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from ..models import Quiz
 from ..utils import create_quiz_data, save_quiz
-from .serializers import QuizCreateSerializer, QuizListSerializer, QuizSerializer
+from .permissions import IsCreatorOfQuiz
+from .serializers import QuizCreateSerializer, QuizReadSerializer, QuizSerializer
 
 
 class QuizListCreateView(APIView):
@@ -24,4 +27,37 @@ class QuizListCreateView(APIView):
 
     def get(self, request):
         quizzes = Quiz.objects.filter(user=request.user)
-        return Response(QuizListSerializer(quizzes, many=True).data)
+        return Response(QuizReadSerializer(quizzes, many=True).data)
+
+
+class QuizDetailView(APIView):
+    permission_classes = [IsAuthenticated, IsCreatorOfQuiz]
+
+    def get(self, request, pk):
+        """
+        Returns a single quiz.
+        """
+        quiz = get_object_or_404(Quiz, pk=pk)
+        self.check_object_permissions(request, quiz)
+        serializer = QuizReadSerializer(quiz)
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        """
+        Deletes a single quiz.
+        """
+        quiz = get_object_or_404(Quiz, pk=pk)
+        self.check_object_permissions(request, quiz)
+        quiz.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    def patch(self, request, pk):
+        """
+        Updates quiz values (partial allowed).
+        """
+        quiz = get_object_or_404(Quiz, pk=pk)
+        self.check_object_permissions(request, quiz)
+        serializer = QuizSerializer(quiz, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)

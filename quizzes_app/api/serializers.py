@@ -41,5 +41,5 @@ class QuestionListSerializer(serializers.ModelSerializer):
         fields = ["id", "question_title", "question_options", "answer"]
 
 
-class QuizListSerializer(QuizSerializer):
+class QuizReadSerializer(QuizSerializer):
     questions = QuestionListSerializer(many=True, read_only=True)
