@@ -151,8 +151,6 @@ MAILERS = {
 }
 
 
-# AUTH_USER_MODEL = "auth_app.User"
-
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("auth_app.api.authentication.CookieJWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": [

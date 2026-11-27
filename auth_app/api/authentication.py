@@ -2,7 +2,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
 class CookieJWTAuthentication(JWTAuthentication):
+    """JWT authentication that reads the access token from the access_token cookie."""
     def authenticate(self, request):
+        """Returns (user, token) from the cookie, or None if no cookie is sent."""
         raw_token = request.COOKIES.get("access_token")
         if raw_token is None:
             return None

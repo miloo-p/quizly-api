@@ -28,7 +28,9 @@ class RegistrationView(APIView):
 
 
 class CookieTokenObtainPairView(TokenObtainPairView):
+    """Logs a user in and sets the JWT tokens as HttpOnly cookies."""
     def post(self, request, *args, **kwargs):
+        """Validates the credentials, returns the user and sets access and refresh cookie."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -66,7 +68,9 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
+    """Issues a new access token from the refresh_token cookie."""
     def post(self, request, *args, **kwargs):
+        """Reads the refresh cookie and sets a new access_token cookie."""
         refresh_token = request.COOKIES.get("refresh_token")
 
         if refresh_token is None:
@@ -101,7 +105,9 @@ class CookieTokenRefreshView(TokenRefreshView):
 
 
 class LogoutView(APIView):
+    """Logs the user out and invalidates the refresh token."""
     def post(self, request):
+        """Blacklists the refresh token and deletes both token cookies."""
         refresh_token = request.COOKIES.get("refresh_token")
 
         if refresh_token is None:

@@ -11,7 +11,9 @@ from .serializers import QuizCreateSerializer, QuizReadSerializer, QuizSerialize
 
 
 class QuizListCreateView(APIView):
+    """Lists the quizzes of the user and creates new ones from a YouTube URL."""
     def post(self, request):
+        """Creates a quiz from the URL via the AI pipeline and returns it."""
         serializer = QuizCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         url = serializer.validated_data["url"]
@@ -26,11 +28,13 @@ class QuizListCreateView(APIView):
         return Response(QuizSerializer(quiz).data, status=status.HTTP_201_CREATED)
 
     def get(self, request):
+        """Returns all quizzes of the logged-in user."""
         quizzes = Quiz.objects.filter(user=request.user)
         return Response(QuizReadSerializer(quizzes, many=True).data)
 
 
 class QuizDetailView(APIView):
+    """Reads, updates and deletes a single quiz of its owner."""
     permission_classes = [IsAuthenticated, IsCreatorOfQuiz]
 
     def get(self, request, pk):
