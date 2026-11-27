@@ -4,13 +4,6 @@ REST API for Quizly, an app that turns a YouTube video into a quiz with 10 multi
 Built with Django and Django REST Framework, JWT authentication in HttpOnly cookies and SQLite.
 The quizzes are created by an AI pipeline with yt-dlp, Whisper and Google Gemini.
 
-## Status
-
-- [x] Registration, login, token refresh and logout
-- [x] Quiz and Question models (also visible in `/admin/`)
-- [x] AI pipeline in `quizzes_app/utils.py`, with tests
-- [ ] Quiz endpoints: create from a YouTube URL, list, read, update, delete
-
 ## How a quiz is created
 
 1. yt-dlp downloads the audio track of the video into a temporary folder.
@@ -50,6 +43,12 @@ The quizzes are created by an AI pipeline with yt-dlp, Whisper and Google Gemini
 
    ```bash
    source .venv/bin/activate
+   ```
+
+   If PowerShell refuses to run the activate script ("running scripts is disabled"), allow local scripts once and try again:
+
+   ```bash
+   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
    ```
 
 3. Install the dependencies:
@@ -102,6 +101,13 @@ The quizzes are created by an AI pipeline with yt-dlp, Whisper and Google Gemini
 
    The API is now available at `http://127.0.0.1:8000/api/`.
 
+## Running the frontend
+
+1. Open the Quizly frontend folder in VS Code.
+2. Right-click `index.html` and choose **Open with Live Server** (extension "Live Server").
+3. Make sure the address bar shows `http://127.0.0.1:5500`, not `localhost`. Otherwise the browser does not send the
+   token cookies to the API at `127.0.0.1:8000`.
+
 ## Running the tests
 
 ```bash
@@ -131,3 +137,32 @@ The tests need no Gemini key and no network access.
 | POST   | `/api/login/`         | Log in and receive the token cookies    |
 | POST   | `/api/token/refresh/` | Get a new access token cookie           |
 | POST   | `/api/logout/`        | Log out and blacklist the refresh token |
+| POST   | `/api/quizzes/`       | Create a quiz from a YouTube URL        |
+| GET    | `/api/quizzes/`       | List all quizzes of the user            |
+| GET    | `/api/quizzes/{id}/`  | Get one quiz with its questions         |
+| PATCH  | `/api/quizzes/{id}/`  | Change title and/or description         |
+| DELETE | `/api/quizzes/{id}/`  | Delete a quiz and all its questions     |
+
+## Decisions where the API doc leaves room
+
+- An error in the AI pipeline (download, Whisper or Gemini fails) returns `500` with a `detail` message. Nothing is
+  saved in that case, quiz and questions are stored in one transaction.
+- A URL that is not a YouTube watch link returns `400` before any download starts.
+- `PATCH` only changes `title` and `description`. `video_url` is read-only and ignored if sent.
+- A quiz of another user returns `403`, an unknown id `404`.
+- Logout without a `refresh_token` cookie or with an invalid one returns `401`.
+- Questions contain `created_at`/`updated_at` only in the response of `POST /api/quizzes/`, as in the API doc.
+
+## Troubleshooting
+
+- **`HTTP Error 403: Forbidden` while creating a quiz** (visible in the `runserver` output): YouTube rejected the
+  download. Clear the yt-dlp cache and try again:
+
+  ```bash
+  python -m yt_dlp --rm-cache-dir
+  ```
+
+  If it still fails, update yt-dlp with `pip install -U yt-dlp`.
+
+- **`503 UNAVAILABLE` from Gemini**: the model is busy. Try again later or set another Flash model in
+  `core/settings.py` (`GEMINI_MODEL`).
