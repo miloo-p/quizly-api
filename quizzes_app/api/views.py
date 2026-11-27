@@ -57,7 +57,7 @@ class QuizDetailView(APIView):
         """
         quiz = get_object_or_404(Quiz, pk=pk)
         self.check_object_permissions(request, quiz)
-        serializer = QuizSerializer(quiz, data=request.data, partial=True)
+        serializer = QuizReadSerializer(quiz, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)

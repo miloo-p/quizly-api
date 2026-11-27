@@ -296,3 +296,109 @@ class QuizDetailTests(APITestCase):
         self.client.cookies.clear()
         response = self.client.get(self.detail_url(self.quiz.id))
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class QuizChangeTestMixin:
+    """Shared setup for PATCH and DELETE: a logged-in owner, his quiz and a foreign quiz."""
+
+    def setUp(self):
+        """Creates the owner with one quiz, another user with one quiz, and logs in the owner."""
+        self.user = User.objects.create_user(username="testuser", password="testpassword123")
+        self.quiz = create_quiz(self.user, title="Old Title")
+        other_user = User.objects.create_user(username="otheruser", password="otherpassword123")
+        self.foreign_quiz = create_quiz(other_user, title="Other Quiz")
+        login_data = {"username": "testuser", "password": "testpassword123"}
+        self.client.post("/api/login/", login_data, format="json")
+
+    def detail_url(self, quiz_id):
+        """Returns the detail URL for the given quiz id."""
+        return f"/api/quizzes/{quiz_id}/"
+
+
+class QuizPatchTests(QuizChangeTestMixin, APITestCase):
+    """Tests for PATCH /api/quizzes/{id}/."""
+
+    def patch_quiz(self, quiz_id, data):
+        """Sends a PATCH request with the given body."""
+        return self.client.patch(self.detail_url(quiz_id), data, format="json")
+
+    def test_patch_title_only_returns_200_in_doc_format(self):
+        """Only the title changes, the description stays, the answer has the doc format."""
+        response = self.patch_quiz(self.quiz.id, {"title": "New Title"})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], "New Title")
+        self.assertEqual(response.data["description"], "Description")
+        quiz_keys = {
+            "id",
+            "title",
+            "description",
+            "created_at",
+            "updated_at",
+            "video_url",
+            "questions",
+        }
+        self.assertEqual(set(response.data.keys()), quiz_keys)
+        question_keys = {"id", "question_title", "question_options", "answer"}
+        self.assertEqual(set(response.data["questions"][0].keys()), question_keys)
+
+    def test_patch_is_saved_and_updates_updated_at(self):
+        """The new title is in the database and updated_at moves forward."""
+        old_updated_at = self.quiz.updated_at
+        self.patch_quiz(self.quiz.id, {"title": "New Title"})
+        self.quiz.refresh_from_db()
+        self.assertEqual(self.quiz.title, "New Title")
+        self.assertGreater(self.quiz.updated_at, old_updated_at)
+
+    def test_blank_title_returns_400(self):
+        """An empty title is rejected and nothing changes."""
+        response = self.patch_quiz(self.quiz.id, {"title": ""})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.quiz.refresh_from_db()
+        self.assertEqual(self.quiz.title, "Old Title")
+
+    def test_foreign_quiz_returns_403(self):
+        """A quiz of another user cannot be changed."""
+        response = self.patch_quiz(self.foreign_quiz.id, {"title": "Hacked"})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.foreign_quiz.refresh_from_db()
+        self.assertEqual(self.foreign_quiz.title, "Other Quiz")
+
+    def test_unknown_id_returns_404(self):
+        """An id that does not exist returns 404."""
+        response = self.patch_quiz(9999, {"title": "New Title"})
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_without_login_returns_401(self):
+        """Without token cookies the user is not authenticated."""
+        self.client.cookies.clear()
+        response = self.patch_quiz(self.quiz.id, {"title": "New Title"})
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class QuizDeleteTests(QuizChangeTestMixin, APITestCase):
+    """Tests for DELETE /api/quizzes/{id}/."""
+
+    def test_delete_own_quiz_returns_204_and_removes_questions(self):
+        """The quiz and all its questions are gone."""
+        response = self.client.delete(self.detail_url(self.quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Quiz.objects.filter(id=self.quiz.id).exists())
+        self.assertFalse(Question.objects.filter(quiz_id=self.quiz.id).exists())
+
+    def test_foreign_quiz_returns_403(self):
+        """A quiz of another user cannot be deleted."""
+        response = self.client.delete(self.detail_url(self.foreign_quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertTrue(Quiz.objects.filter(id=self.foreign_quiz.id).exists())
+
+    def test_unknown_id_returns_404(self):
+        """An id that does not exist returns 404."""
+        response = self.client.delete(self.detail_url(9999))
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_without_login_returns_401(self):
+        """Without token cookies the user is not authenticated."""
+        self.client.cookies.clear()
+        response = self.client.delete(self.detail_url(self.quiz.id))
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertTrue(Quiz.objects.filter(id=self.quiz.id).exists())
