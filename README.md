@@ -127,7 +127,17 @@ The tests need no Gemini key and no network access.
 - Only YouTube links like `https://www.youtube.com/watch?v=<id>` are accepted (also `youtube.com` and `m.youtube.com`).
   Short links (`youtu.be`) are not.
 - Whisper runs locally with the `base` model, which is downloaded on first use (about 140 MB).
-- The Gemini model is set in `core/settings.py` (`GEMINI_MODEL`).
+- The Gemini model is set in `core/settings.py`. Default: `GEMINI_MODEL = "gemini-3.5-flash-lite"`.
+  To switch, replace the name with another Flash model, for example:
+  - `gemini-3.5-flash-lite` (default)
+  - `gemini-3.1-flash-lite`
+  - `gemini-3.5-flash`
+  - `gemini-3.6-flash`
+  - `gemini-3.7-flash`
+  - `gemini-3.8-flash`
+
+  Which models your API key can use may change over time (older ones like `gemini-2.5-flash` are no longer
+  available for new keys). The current list is shown in Google AI Studio.
 
 ## Endpoints
 
